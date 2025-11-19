@@ -1,0 +1,10 @@
+pandas
+numpy
+tqdm
+requests
+beautifulsoup4
+nltk
+sentence-transformers
+streamlit
+matplotlib
+scikit-learn
