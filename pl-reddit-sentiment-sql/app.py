@@ -1,17 +1,39 @@
 import argparse, sqlite3, pandas as pd, numpy as np, streamlit as st
 import datetime as dt
 import matplotlib.pyplot as plt
+from pathlib import Path
 
 st.set_page_config(page_title="PL Reddit Sentiment + Odds", layout="wide")
 
 parser = argparse.ArgumentParser(add_help=False)
 parser.add_argument("--db", default="pl.db")
 args, _ = parser.parse_known_args()
-conn = sqlite3.connect(args.db)
+
+# For deployment: use bundled pl.db in same directory as app.py
+DB_PATH = Path(__file__).parent / args.db
+if not DB_PATH.exists():
+    DB_PATH = Path(args.db)  # fallback to relative path
+
+@st.cache_resource
+def get_connection():
+    """Cached DB connection for performance."""
+    return sqlite3.connect(str(DB_PATH), check_same_thread=False)
+
+conn = get_connection()
 
 # --- Helper functions ---
+@st.cache_data(ttl=600)
 def table_exists(name):
-    return pd.read_sql_query("SELECT COUNT(1) n FROM sqlite_master WHERE type='table' AND name=?;", conn, params=(name,)).loc[0,'n'] > 0
+    return pd.read_sql_query("SELECT COUNT(1) n FROM sqlite_master WHERE type='table' AND name=?;", get_connection(), params=(name,)).loc[0,'n'] > 0
+
+@st.cache_data(ttl=600)
+def get_counts():
+    """Get thread/comment/match counts (cached)."""
+    conn = get_connection()
+    threads_n = pd.read_sql_query("SELECT COUNT(*) AS n FROM threads", conn).loc[0,'n'] if table_exists('threads') else 0
+    comments_n = pd.read_sql_query("SELECT COUNT(*) AS n FROM comments", conn).loc[0,'n'] if table_exists('comments') else 0
+    matches_n = pd.read_sql_query("SELECT COUNT(*) AS n FROM matches", conn).loc[0,'n'] if table_exists('matches') else 0
+    return int(threads_n), int(comments_n), int(matches_n)
 
 TEAMS = [
     "Arsenal","Aston Villa","Bournemouth","Brentford","Brighton",
@@ -43,9 +65,7 @@ st.sidebar.title("Navigation")
 page = st.sidebar.radio("Go to", ["Overview", "Team Analysis", "Matches & Odds", "Raw Data"])
 
 # --- Data loading ---
-threads_n = pd.read_sql_query("SELECT COUNT(*) AS n FROM threads", conn).loc[0,'n'] if table_exists('threads') else 0
-comments_n = pd.read_sql_query("SELECT COUNT(*) AS n FROM comments", conn).loc[0,'n'] if table_exists('comments') else 0
-matches_n = pd.read_sql_query("SELECT COUNT(*) AS n FROM matches", conn).loc[0,'n'] if table_exists('matches') else 0
+threads_n, comments_n, matches_n = get_counts()
 
 # ============================================================
 # PAGE: Overview

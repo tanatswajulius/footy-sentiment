@@ -54,6 +54,7 @@ Each step writes into the same SQLite file (default `pl.db`). Provide `--db path
 | 5. Score sentiment + embeddings | `python cli.py analyze --db pl.db --limit 5000` | Runs VADER + MiniLM on unanalyzed comments (batched). Repeat until queue empty or adjust `--limit`. |
 | 6. Explore UI | `streamlit run app.py -- --db pl.db` | Metrics, keyword averages, top positive threads, odds table, sentiment vs odds. |
 | 7. (Optional) Compare predictors | `python cli.py compare-predictors --db pl.db --min-comments 15` | Builds match-level features and cross-validates odds, sentiment, and combined models. |
+| 8. (Optional) Team profiles | `python cli.py team-profiles --db pl.db --output-csv profiles.csv` | Aggregates sentiment per team, correlates with historical form, exports CSV. |
 
 Tips:
 - Adjust scrape keywords to cover both team nicknames and full names. Update `HEADERS` in `scrape_reddit.py` with your own User-Agent to be polite.
@@ -67,13 +68,47 @@ Tips:
 streamlit run app.py -- --db pl.db
 ```
 
-The Streamlit script parses `--db` itself (everything after `--`). Sections unlock progressively:
-- Keyword-level sentiment summary + bar chart (after `comments` populated + analyzed).
-- Top positive threads with ≥10 comments.
-- Latest matches table once odds are loaded.
-- Linked thread → match sentiment scatter when `link-threads` + `analyze` have run.
+The Streamlit script parses `--db` itself (everything after `--`). 
 
-Deploy Streamlit Cloud or share by running `streamlit run` and forwarding port 8501.
+### Dashboard Pages
+
+| Page | What It Shows |
+|------|---------------|
+| **Overview** | Metrics, sentiment by keyword bar chart, top positive threads |
+| **Team Analysis** | Sentiment rankings, box plots, scatter (sentiment vs win%), outcome breakdown |
+| **Matches & Odds** | Season filter, match table with implied probabilities, outcome distribution |
+| **Raw Data** | Browse threads/comments/matches tables directly |
+
+Sections unlock progressively as you populate data via CLI commands.
+
+---
+
+## Deploying to Streamlit Cloud
+
+The app comes with a pre-populated `pl.db` database (48MB) containing threads, comments, and match odds ready for exploration.
+
+### Quick Deploy Steps
+
+1. **Push to GitHub** (if not already):
+   ```bash
+   git add pl.db app.py cli.py db.py requirements.txt .streamlit/
+   git commit -m "Add static data for deployment"
+   git push
+   ```
+
+2. **Deploy on Streamlit Cloud**:
+   - Go to [share.streamlit.io](https://share.streamlit.io)
+   - Click "New app"
+   - Select your GitHub repo
+   - Set **Main file path**: `pl-reddit-sentiment-sql/app.py`
+   - Click "Deploy"
+
+3. **That's it!** The app will use the bundled `pl.db` automatically.
+
+### Notes
+- The database is read-only on Streamlit Cloud (no new scrapes/analysis in prod)
+- To update data: run locally, re-commit `pl.db`, redeploy
+- For larger databases (>100MB), use Git LFS or external storage
 
 ---
 
